@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMU Real-Time Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #03dac6;
+            --danger-color: #cf6679;
+            --record-color: #ff3b30;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 98%;
+            max-width: 100%;
+            display: grid;
+            gap: 20px;
+        }
+
+        /* --- Header & Controls --- */
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            gap: 15px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.8; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+
+        /* Specific Button Styles */
+        .btn-record { background-color: var(--text-color); }
+        .btn-stop { background-color: var(--danger-color); color: white; display: none;} 
+
+        select {
+            padding: 10px;
+            border-radius: 6px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+        }
+
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            background-color: #333;
+        }
+        .status-badge.connected { background-color: var(--accent-color); color: black; }
+        .status-badge.disconnected { background-color: var(--danger-color); color: white; }
+
+        /* Recording Indicator */
+        .rec-indicator {
+            display: none;
+            align-items: center;
+            gap: 5px;
+            color: var(--record-color);
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .rec-dot {
+            width: 12px;
+            height: 12px;
+            background-color: var(--record-color);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* --- Battery --- */
+        .battery-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2rem;
+        }
+        .battery-icon {
+            width: 30px;
+            height: 15px;
+            border: 2px solid var(--text-color);
+            border-radius: 3px;
+            position: relative;
+            padding: 1px;
+        }
+        .battery-icon::after {
+            content: '';
+            position: absolute;
+            right: -5px;
+            top: 3px;
+            width: 3px;
+            height: 9px;
+            background: var(--text-color);
+            border-radius: 0 2px 2px 0;
+        }
+        .battery-fill {
+            height: 100%;
+            background: var(--accent-color);
+            width: 0%; 
+            transition: width 0.5s;
+        }
+
+        /* --- Charts --- */
+        .charts-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .chart-card {
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h2 { margin-top: 0; font-size: 1.2rem; color: #aaa; }
+        @media (max-width: 800px) { .charts-wrapper { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>IMU Dashboard</h1>
+                <span id="connectionStatus" class="status-badge disconnected">Disconnected</span>
+                <div id="recIndicator" class="rec-indicator">
+                    <div class="rec-dot"></div> REC
+                </div>
+            </div>
+            
+            <div class="battery-container">
+                <div class="battery-icon">
+                    <div id="battFill" class="battery-fill"></div>
+                </div>
+                <span id="battText">--%</span>
+            </div>
+
+            <div class="controls">
+                <button id="btnRec" class="btn-record" onclick="startRecording()" disabled>💾 Record</button>
+                <button id="btnStop" class="btn-stop" onclick="stopRecording()">⏹ Stop</button>
+                
+                <div style="width: 1px; height: 30px; background: #444; margin: 0 10px;"></div> <button id="btnScan" onclick="scanDevices()">🔍 Scan</button>
+                <select id="deviceSelect"><option>Select Device...</option></select>
+                <button id="btnConnect" onclick="connectDevice()" disabled>🔗 Connect</button>
+            </div>
+        </div>
+
+        <div class="charts-wrapper">
+            <div class="chart-card">
+                <h2>Accelerometer (g)</h2>
+                <canvas id="accChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h2>Gyroscope (deg/s)</h2>
+                <canvas id="gyroChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Global State ---
+        let ws;
+        const maxDataPoints = 100;
+        
+        // --- Chart Config ---
+        const commonOptions = {
+            responsive: true, animation: false,
+            scales: { x: { display: false }, y: { grid: { color: '#333' } } },
+            elements: { point: { radius: 0 } },
+            plugins: { legend: { labels: { color: '#ddd' } } }
+        };
+
+        const accChart = new Chart(document.getElementById('accChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'X', borderColor: '#ff6384', borderWidth: 2, data: [] },
+                    { label: 'Y', borderColor: '#36a2eb', borderWidth: 2, data: [] },
+                    { label: 'Z', borderColor: '#4bc0c0', borderWidth: 2, data: [] }
+                ]
+            }, options: commonOptions
+        });
+
+        const gyroChart = new Chart(document.getElementById('gyroChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'X', borderColor: '#ff9f40', borderWidth: 2, data: [] },
+                    { label: 'Y', borderColor: '#9966ff', borderWidth: 2, data: [] },
+                    { label: 'Z', borderColor: '#ffcd56', borderWidth: 2, data: [] }
+                ]
+            }, options: commonOptions
+        });
+
+        // --- Functions ---
+
+        async function scanDevices() {
+            const btn = document.getElementById('btnScan');
+            const select = document.getElementById('deviceSelect');
+            btn.textContent = "Scanning..."; btn.disabled = true;
+            select.innerHTML = "<option>Scanning...</option>";
+
+            try {
+                const response = await fetch('/scan');
+                const devices = await response.json();
+                select.innerHTML = "";
+                devices.forEach(dev => {
+                    const option = document.createElement("option");
+                    option.value = dev.address;
+                    option.textContent = `${dev.name} (${dev.address})`;
+                    select.appendChild(option);
+                });
+                if(devices.length > 0) document.getElementById('btnConnect').disabled = false;
+                else select.innerHTML = "<option>No devices found</option>";
+            } catch (e) { console.error(e); alert("Scan failed"); } 
+            finally { btn.textContent = "🔍 Scan"; btn.disabled = false; }
+        }
+
+        async function connectDevice() {
+            const address = document.getElementById('deviceSelect').value;
+            const statusBadge = document.getElementById('connectionStatus');
+            const btnConnect = document.getElementById('btnConnect');
+
+            statusBadge.textContent = "Connecting...";
+            statusBadge.className = "status-badge";
+            btnConnect.disabled = true;
+
+            try {
+                const response = await fetch(`/connect/${address}`, { method: 'POST' });
+                const result = await response.json();
+
+                if (result.status === "connected") {
+                    statusBadge.textContent = "Connected";
+                    statusBadge.className = "status-badge connected";
+                    updateBattery(result.battery);
+                    document.getElementById('btnRec').disabled = false; // Enable record button
+                    startWebSocket();
+                }
+            } catch (e) {
+                console.error(e);
+                statusBadge.textContent = "Failed";
+                statusBadge.className = "status-badge disconnected";
+                btnConnect.disabled = false;
+            }
+        }
+
+        // --- Recording Functions ---
+        async function startRecording() {
+            try {
+                const res = await fetch('/record/start', { method: 'POST' });
+                const data = await res.json();
+                if(data.status === "started") {
+                    document.getElementById('btnRec').style.display = "none";
+                    document.getElementById('btnStop').style.display = "inline-block";
+                    document.getElementById('recIndicator').style.display = "flex";
+                }
+            } catch(e) { console.error("Rec Start Error", e); }
+        }
+
+        async function stopRecording() {
+            try {
+                const res = await fetch('/record/stop', { method: 'POST' });
+                const data = await res.json();
+                if(data.status === "stopped") {
+                    document.getElementById('btnRec').style.display = "inline-block";
+                    document.getElementById('btnStop').style.display = "none";
+                    document.getElementById('recIndicator').style.display = "none";
+                    alert("Recording Saved!");
+                }
+            } catch(e) { console.error("Rec Stop Error", e); }
+        }
+
+        function updateBattery(level) {
+            const fill = document.getElementById('battFill');
+            const text = document.getElementById('battText');
+            if(level < 0) { text.textContent = "N/A"; fill.style.width = "0%"; }
+            else {
+                text.textContent = level + "%"; fill.style.width = level + "%";
+                fill.style.background = level < 20 ? "#cf6679" : "#03dac6";
+            }
+        }
+
+        function startWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            ws.onmessage = (event) => {
+                const packet = JSON.parse(event.data);
+                
+                accChart.data.labels.push(packet.time);
+                gyroChart.data.labels.push(packet.time);
+
+                accChart.data.datasets[0].data.push(packet.ax);
+                accChart.data.datasets[1].data.push(packet.ay);
+                accChart.data.datasets[2].data.push(packet.az);
+
+                gyroChart.data.datasets[0].data.push(packet.gx);
+                gyroChart.data.datasets[1].data.push(packet.gy);
+                gyroChart.data.datasets[2].data.push(packet.gz);
+
+                if (accChart.data.labels.length > maxDataPoints) {
+                    accChart.data.labels.shift();
+                    accChart.data.datasets.forEach(ds => ds.data.shift());
+                    gyroChart.data.labels.shift();
+                    gyroChart.data.datasets.forEach(ds => ds.data.shift());
+                }
+                accChart.update('none');
+                gyroChart.update('none');
+            };
+            ws.onclose = () => {
+                document.getElementById('connectionStatus').textContent = "Disconnected";
+                document.getElementById('connectionStatus').className = "status-badge disconnected";
+                document.getElementById('btnConnect').disabled = false;
+                document.getElementById('btnRec').disabled = true; // Disable record if disconnected
+                // Reset recording UI just in case
+                document.getElementById('recIndicator').style.display = "none";
+                document.getElementById('btnRec').style.display = "inline-block";
+                document.getElementById('btnStop').style.display = "none";
+            };
+        }
+    </script>
+</body>
+</html>
