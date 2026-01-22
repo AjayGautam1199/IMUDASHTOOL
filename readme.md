@@ -1,24 +1,45 @@
 # IMUDASHTOOL
 
-IMU Data Visualization Tool written in Python.
+IMUDASHTOOL is a Python-based application for visualizing IMU (Inertial Measurement Unit) sensor data in real time.
+
+## Prerequisites
+
+* Python 3.x installed on your system
+* `pip` package manager available
 
 ## Setup & Run
 
-Make sure you have **Python 3** installed.
+Follow the steps below to set up and run the application.
 
-# Create virtual environment
+### 1. Create a Virtual Environment
 
 ```bash
 python3 -m venv venv
+```
 
-# Activate virtual environment
+### 2. Activate the Virtual Environment
+
 ```bash
 source venv/bin/activate
+```
 
-# Install dependencies
+### 3. Install Dependencies
+
 ```bash
 pip3 install -r requirements.txt
+```
 
-# Run the application
+### 4. Run the Application
+
 ```bash
 python3 main.py
+```
+
+## Notes
+
+* Make sure the virtual environment is activated before installing dependencies or running the application.
+* To deactivate the virtual environment, use:
+
+```bash
+deactivate
+```
