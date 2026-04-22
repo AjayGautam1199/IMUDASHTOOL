@@ -43,3 +43,18 @@ python3 main.py
 ```bash
 deactivate
 ```
+
+
+## i've used:
+
+1. sys
+2. asyncio
+3. json
+4. struct
+5. csv
+6. time
+7. datetime
+8. List
+9. FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+10. HTMLResponse
+11. BleakScanner, BleakClient
